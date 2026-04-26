@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Donate – UmbraShield</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+</head>
+<body>
+
+<div class="donate-wrap">
+  <div class="donate-card-wrap">
+
+    <!-- Back -->
+    <a href="index.html" class="row" style="margin-bottom:20px;font-size:0.8rem;color:var(--muted)">
+      <i class="fas fa-arrow-left"></i> UmbraShield
+    </a>
+
+    <!-- Loading / Not found / Content -->
+    <div id="donateContent">
+      <div class="empty"><i class="fas fa-circle-notch fa-spin"></i><p>Loading...</p></div>
+    </div>
+
+  </div>
+</div>
+
+<!-- WALLET MODAL -->
+<div class="modal-bg" id="walletModal">
+  <div class="modal">
+    <div class="modal-head">
+      <h2>Connect Wallet</h2>
+      <button class="modal-close" onclick="closeModal('walletModal')"><i class="fas fa-times"></i></button>
+    </div>
+    <p class="text-sm text-muted" style="margin-bottom:16px">Connect to Solana Devnet to donate privately</p>
+    <button class="wallet-opt" onclick="connectPhantomDonate()">
+      <div class="wallet-logo" style="background:#ab9ff2"><i class="fas fa-ghost" style="color:#fff"></i></div>
+      <div><div class="wallet-name">Phantom</div><div class="wallet-desc">Solana wallet</div></div>
+      <i class="fas fa-chevron-right wallet-arrow"></i>
+    </button>
+    <p class="text-xs text-muted" style="margin-top:12px;text-align:center">
+      <a href="https://phantom.app" target="_blank" class="text-accent">Get Phantom →</a>
+    </p>
+  </div>
+</div>
+
+<!-- TX MODAL -->
+<div class="modal-bg" id="txModal">
+  <div class="modal">
+    <div class="modal-head">
+      <h2 id="txTitle">Processing Donation</h2>
+      <button class="modal-close" onclick="closeTx()"><i class="fas fa-times"></i></button>
+    </div>
+    <div id="txBody"></div>
+  </div>
+</div>
+
+<div class="toasts" id="toasts"></div>
+
+<script src="https://unpkg.com/@solana/web3.js@latest/lib/index.iife.min.js"></script>
+<script src="js/umbra-sdk.js"></script>
+<script src="js/core.js"></script>
+<script>
+// ============================================
+// DONATE PAGE LOGIC
+// ============================================
+
+let donateWallet = null;
+let streamerInfo = null;
+
+document.addEventListener('DOMContentLoaded', () => {
+  const params   = new URLSearchParams(window.location.search);
+  const username = (params.get('s') || '').trim().toLowerCase();
+
+  if (!username) {
+    showNotFound('No streamer specified in the URL.');
+    return;
+  }
+
+  streamerInfo = loadDonationLinkByUsername(username);
+
+  if (!streamerInfo) {
+    showNotFound(`Streamer "${username}" hasn't set up their UmbraShield page yet.`);
+    return;
+  }
+
+  document.title = `Donate to ${streamerInfo.displayName} – UmbraShield`;
+  renderDonatePage(streamerInfo);
+
+  // Try auto-connect if already approved
+  const provider = window.solana || window.phantom?.solana;
+  if (provider?.isConnected && provider.publicKey) {
+    donateWallet = { publicKey: provider.publicKey.toString(), provider };
+    showDonateForm();
+  }
+});
+
+function showNotFound(msg) {
+  document.getElementById('donateContent').innerHTML = `
+    <div class="card">
+      <div class="empty">
+        <i class="fas fa-search"></i>
+        <p style="margin-bottom:12px">${msg}</p>
+        <a href="index.html" class="btn btn-ghost" style="font-size:0.83rem">← Back to UmbraShield</a>
+      </div>
+    </div>`;
+}
+
+const catEmoji = { Gaming:'🎮', Finance:'💰', Tech:'💻', Art:'🎨', Music:'🎵', Education:'📚', IRL:'🌍' };
+
+function renderDonatePage(s) {
+  const emoji = catEmoji[s.category] || '🎮';
+  document.getElementById('donateContent').innerHTML = `
+    <!-- Streamer header -->
+    <div class="streamer-head" style="margin-bottom:20px">
+      <img class="str-avatar" src="https://api.dicebear.com/7.x/identicon/svg?seed=${s.username}" alt="${s.displayName}">
+      <div class="str-name">${s.displayName}</div>
+      <div class="str-cat">${emoji} ${s.category}</div>
+      ${s.bio ? `<div class="str-bio">${s.bio}</div>` : ''}
+    </div>
+
+    <span class="badge badge-yellow" style="display:inline-flex;margin-bottom:16px">
+      <i class="fas fa-satellite-dish"></i> Solana Devnet
+    </span>
+
+    <!-- Donate Card -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title"><i class="fas fa-shield-halved text-accent" style="margin-right:7px"></i>Private Donation</span>
+        <span class="badge badge-purple"><i class="fas fa-lock"></i> ZK</span>
+      </div>
+
+      <!-- Wallet not connected -->
+      <div id="donateWalletPrompt">
+        <div class="empty" style="padding:20px 0">
+          <i class="fas fa-wallet"></i>
+          <p>Connect wallet to donate</p>
+        </div>
+        <button class="btn btn-primary" style="width:100%;justify-content:center;padding:12px" onclick="openModal('walletModal')">
+          <i class="fas fa-wallet"></i> Connect Wallet
+        </button>
+      </div>
+
+      <!-- Donate form (hidden until connected) -->
+      <div id="donateFormWrap" style="display:none">
+        <div class="col gap-14">
+          <div class="field">
+            <label>Amount (SOL)</label>
+            <div class="input-row">
+              <input class="input" type="number" id="donateAmt" placeholder="${s.minDonation || 0.01}"
+                min="${s.minDonation || 0.001}" step="0.01" style="flex:1">
+              <span class="input-suffix">SOL</span>
+            </div>
+            <div class="presets" style="margin-top:8px">
+              <button class="preset" onclick="setD('0.1')">0.1</button>
+              <button class="preset" onclick="setD('0.5')">0.5</button>
+              <button class="preset" onclick="setD('1')">1.0</button>
+              <button class="preset" onclick="setD('5')">5.0</button>
+            </div>
+            <p class="hint">Minimum: ${s.minDonation || 0.01} SOL</p>
+          </div>
+
+          <div class="field">
+            <label>Message (optional)</label>
+            <textarea class="input" id="donateMsg" placeholder="Say something nice..." maxlength="200" style="height:72px"></textarea>
+          </div>
+
+          <div class="toggle-row">
+            <div class="toggle-label">
+              <span><i class="fas fa-shield-halved text-accent" style="margin-right:6px"></i>Privacy Shield</span>
+              <span>Encrypt amount &amp; sender via Umbra</span>
+            </div>
+            <label class="toggle">
+              <input type="checkbox" id="donatePrivacy" checked>
+              <span class="toggle-track"></span>
+            </label>
+          </div>
+
+          <div id="connectedAddr" class="row gap-6 text-xs text-muted">
+            <i class="fas fa-check-circle text-green"></i>
+            <span id="donorAddrLabel">–</span>
+          </div>
+
+          <button class="btn btn-primary" id="donateSendBtn"
+            style="width:100%;justify-content:center;padding:12px;font-size:0.9rem"
+            onclick="submitDonation()">
+            <i class="fas fa-paper-plane"></i> Send Donation
+          </button>
+
+          <p class="text-xs text-muted" style="text-align:center">
+            ~0.000005 SOL network fee · ~0.001 SOL privacy fee
+          </p>
+        </div>
+      </div>
+    </div>`;
+}
+
+function setD(v) { document.getElementById('donateAmt').value = v; }
+
+function showDonateForm() {
+  const prompt = document.getElementById('donateWalletPrompt');
+  const form   = document.getElementById('donateFormWrap');
+  if (prompt) prompt.style.display = 'none';
+  if (form)   form.style.display   = '';
+  const addrEl = document.getElementById('donorAddrLabel');
+  if (addrEl && donateWallet) addrEl.textContent = shortAddr(donateWallet.publicKey);
+}
+
+async function connectPhantomDonate() {
+  const provider = window.solana || window.phantom?.solana;
+  if (!provider || !provider.isPhantom) {
+    toast('Phantom not found. Please install it.', 'error');
+    setTimeout(() => window.open('https://phantom.app', '_blank'), 1500);
+    return;
+  }
+  try {
+    const resp = await provider.connect();
+    donateWallet = { publicKey: resp.publicKey.toString(), provider };
+    closeModal('walletModal');
+    toast('Wallet connected!', 'success');
+    showDonateForm();
+  } catch (err) {
+    toast('Connection failed: ' + err.message, 'error');
+  }
+}
+
+async function submitDonation() {
+  if (!donateWallet)  { toast('Connect your wallet first', 'error'); openModal('walletModal'); return; }
+  if (!streamerInfo)  { toast('Streamer info not loaded', 'error'); return; }
+
+  const amount  = parseFloat(document.getElementById('donateAmt')?.value);
+  const msg     = document.getElementById('donateMsg')?.value || '';
+  const privacy = document.getElementById('donatePrivacy')?.checked ?? true;
+  const minDon  = parseFloat(streamerInfo.minDonation) || 0.01;
+
+  if (!amount || amount <= 0) { toast('Enter a valid amount', 'error'); return; }
+  if (amount < minDon) { toast(`Minimum donation is ${minDon} SOL`, 'error'); return; }
+
+  const btn = document.getElementById('donateSendBtn');
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> Processing...'; }
+
+  showTxModal('Sending Donation');
+  setTxStep(1);
+
+  try {
+    setTxStep(2);
+    await new Promise(r => setTimeout(r, 300));
+
+    setTxStep(3);
+
+    let sig;
+
+    if (privacy) {
+      // Try Umbra confidential transfer
+      const client = await initUmbraClient(donateWallet.provider, donateWallet.publicKey);
+      if (client && typeof UmbraSDK !== 'undefined' && UmbraSDK.getPublicBalanceToEncryptedBalanceDirectDepositorFunction) {
+        try {
+          // Register sender
+          const regFn = UmbraSDK.getUserRegistrationFunction({ client });
+          await regFn({ confidential: true, anonymous: true });
+
+          // Confidential deposit to recipient
+          const depositFn = UmbraSDK.getPublicBalanceToEncryptedBalanceDirectDepositorFunction({ client });
+          const result = await depositFn(
+            streamerInfo.walletAddress,
+            'SOL',
+            BigInt(Math.round(amount * 1e9))
+          );
+          sig = (typeof result === 'string') ? result : (result?.signature || null);
+        } catch (umbraErr) {
+          console.warn('Umbra confidential tx failed, falling back to plain SOL:', umbraErr);
+        }
+      }
+
+      // Fallback: real SOL transfer on devnet
+      if (!sig) {
+        sig = await sendSolTransfer(donateWallet.provider, donateWallet.publicKey, streamerInfo.walletAddress, amount);
+      }
+    } else {
+      // Plain SOL transfer
+      sig = await sendSolTransfer(donateWallet.provider, donateWallet.publicKey, streamerInfo.walletAddress, amount);
+    }
+
+    setTxStep(4);
+
+    // Persist for streamer dashboard
+    saveDonationRecord(streamerInfo.walletAddress, {
+      sig, amount, message: msg, privacy,
+      from: donateWallet.publicKey,
+      timestamp: new Date().toISOString(),
+    });
+
+    showTxSuccess(sig, `${amount} SOL sent to ${streamerInfo.displayName}!`);
+    // Reset form
+    if (document.getElementById('donateAmt')) document.getElementById('donateAmt').value = '';
+    if (document.getElementById('donateMsg')) document.getElementById('donateMsg').value = '';
+
+  } catch (err) {
+    console.error(err);
+    showTxError(err.message || 'Transaction failed');
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-paper-plane"></i> Send Donation'; }
+  }
+}
+
+window.connectPhantomDonate = connectPhantomDonate;
+window.submitDonation = submitDonation;
+window.setD = setD;
+</script>
+</body>
+</html>

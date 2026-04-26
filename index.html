@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>UmbraShield – Private Solana Donations</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+</head>
+<body>
+
+<!-- NAV -->
+<nav class="navbar">
+  <div class="nav-inner">
+    <a href="index.html" class="logo">
+      <div class="logo-icon"><i class="fas fa-shield-halved"></i></div>
+      Umbra<span class="logo-accent">Shield</span>
+    </a>
+    <div class="nav-links">
+      <a href="#how" class="nav-link">How It Works</a>
+      <a href="#donate" class="nav-link">Donate</a>
+    </div>
+    <div class="nav-right">
+      <div class="net-badge"><span class="net-dot"></span> Devnet</div>
+      <button class="btn btn-connect" id="connectBtn">
+        <i class="fas fa-wallet"></i> Connect Wallet
+      </button>
+    </div>
+  </div>
+</nav>
+
+<!-- MAIN -->
+<div class="home-wrap">
+
+  <!-- HERO -->
+  <section class="hero">
+    <div class="hero-eyebrow">
+      <span class="dot"></span>
+      Running on Solana Devnet
+    </div>
+    <h1 class="hero-title">
+      Private Donations<br>
+      for <span class="grad">Solana Streamers</span>
+    </h1>
+    <p class="hero-sub">
+      Receive shielded donations without exposing your wallet.
+      Powered by Umbra Privacy SDK &amp; zero-knowledge proofs.
+    </p>
+    <div class="hero-btns">
+      <a href="dashboard/index.html" class="btn btn-primary" id="streamerCta">
+        <i class="fas fa-user"></i> I'm a Streamer
+      </a>
+      <a href="#donate" class="btn btn-ghost">
+        <i class="fas fa-heart"></i> Donate Now
+      </a>
+    </div>
+  </section>
+
+  <!-- HOW IT WORKS -->
+  <section id="how">
+    <div class="card-header" style="margin-bottom:20px">
+      <span class="card-title">How It Works</span>
+    </div>
+    <div class="how-grid" style="margin-bottom:40px">
+      <div class="card-sm how-card">
+        <div class="how-num">01</div>
+        <h3>Connect Wallet</h3>
+        <p>Login with Phantom on Solana Devnet. Your session is saved until you disconnect.</p>
+      </div>
+      <div class="card-sm how-card">
+        <div class="how-num">02</div>
+        <h3>Create Your Link</h3>
+        <p>Set a custom username and share your donation page with your audience.</p>
+      </div>
+      <div class="card-sm how-card">
+        <div class="how-num">03</div>
+        <h3>Receive Privately</h3>
+        <p>Fans donate via Umbra's shielded transfers — amounts and senders are hidden.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- DONATE SECTION -->
+  <section id="donate" class="donate-section">
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title"><i class="fas fa-heart text-accent" style="margin-right:7px"></i>Send a Donation</span>
+        <div class="row gap-6">
+          <span class="badge badge-yellow"><i class="fas fa-satellite-dish"></i> Devnet</span>
+        </div>
+      </div>
+
+      <!-- Wallet not connected -->
+      <div id="homeWalletPrompt">
+        <div class="empty">
+          <i class="fas fa-wallet"></i>
+          <p>Connect your wallet to send a donation</p>
+        </div>
+        <button class="btn btn-primary" style="width:100%;justify-content:center;padding:12px" onclick="openWalletModal()">
+          <i class="fas fa-wallet"></i> Connect Wallet
+        </button>
+      </div>
+
+      <!-- Donate form -->
+      <div id="donateForm" style="display:none">
+        <div class="col gap-14">
+
+          <div class="field">
+            <label>Streamer Username</label>
+            <input class="input input-mono" id="homeStreamerInput"
+              placeholder="e.g. cryptoninja (their custom link username)">
+            <p class="hint">Ask the streamer for their UmbraShield username</p>
+          </div>
+
+          <div class="field">
+            <label>Amount (SOL)</label>
+            <div class="input-row">
+              <input class="input" id="homeAmount" type="number" placeholder="0.10" min="0.001" step="0.01" style="flex:1">
+              <span class="input-suffix">SOL</span>
+            </div>
+            <div class="presets" style="margin-top:8px">
+              <button class="preset" onclick="setAmt('0.1')">0.1</button>
+              <button class="preset" onclick="setAmt('0.5')">0.5</button>
+              <button class="preset" onclick="setAmt('1')">1.0</button>
+              <button class="preset" onclick="setAmt('5')">5.0</button>
+            </div>
+          </div>
+
+          <div class="field">
+            <label>Message (optional)</label>
+            <textarea class="input" id="homeMsg" placeholder="Send a message..." maxlength="200" style="height:70px"></textarea>
+          </div>
+
+          <div class="toggle-row">
+            <div class="toggle-label">
+              <span><i class="fas fa-shield-halved text-accent" style="margin-right:6px"></i>Umbra Privacy Shield</span>
+              <span>Encrypt amount &amp; hide sender via Umbra SDK</span>
+            </div>
+            <label class="toggle">
+              <input type="checkbox" id="homePrivacy" checked>
+              <span class="toggle-track"></span>
+            </label>
+          </div>
+
+          <button class="btn btn-primary" id="homeDonateBtn" style="width:100%;justify-content:center;padding:12px;font-size:0.9rem" onclick="submitHomeDonation()">
+            <i class="fas fa-paper-plane"></i> Send Donation
+          </button>
+
+          <p class="text-xs text-muted" style="text-align:center">
+            Network fee: ~0.000005 SOL &nbsp;·&nbsp; Privacy fee: ~0.001 SOL
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</div>
+
+<!-- WALLET MODAL -->
+<div class="modal-bg" id="walletModal">
+  <div class="modal">
+    <div class="modal-head">
+      <h2>Connect Wallet</h2>
+      <button class="modal-close" onclick="closeModal('walletModal')"><i class="fas fa-times"></i></button>
+    </div>
+    <p class="text-sm text-muted" style="margin-bottom:16px">Connect to UmbraShield on Solana Devnet</p>
+    <button class="wallet-opt" id="phantomBtn" onclick="connectPhantom()">
+      <div class="wallet-logo" style="background:#ab9ff2;"><i class="fas fa-ghost" style="color:#fff"></i></div>
+      <div><div class="wallet-name">Phantom</div><div class="wallet-desc">Most popular Solana wallet</div></div>
+      <i class="fas fa-chevron-right wallet-arrow"></i>
+    </button>
+    <p class="text-xs text-muted" style="margin-top:12px;text-align:center">
+      Don't have Phantom? <a href="https://phantom.app" target="_blank" class="text-accent">Get it here →</a>
+    </p>
+  </div>
+</div>
+
+<!-- TX MODAL -->
+<div class="modal-bg" id="txModal">
+  <div class="modal">
+    <div class="modal-head">
+      <h2 id="txTitle">Processing</h2>
+      <button class="modal-close" onclick="closeTx()"><i class="fas fa-times"></i></button>
+    </div>
+    <div id="txBody"></div>
+  </div>
+</div>
+
+<div class="toasts" id="toasts"></div>
+
+<script src="https://unpkg.com/@solana/web3.js@latest/lib/index.iife.min.js"></script>
+<script src="js/umbra-sdk.js"></script>
+<script src="js/core.js"></script>
+<script src="js/home.js"></script>
+</body>
+</html>
